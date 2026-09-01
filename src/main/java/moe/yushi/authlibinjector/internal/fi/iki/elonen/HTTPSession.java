@@ -256,7 +256,14 @@ class HTTPSession implements IHTTPSession {
 					;
 			}
 
-			boolean keepAlive = "HTTP/1.1".equals(this.protocolVersion) && !"close".equals(this.headers.get("connection"));
+			// Always close after one response. This server only ever serves single-shot
+			// internal authlib API calls, and forcing "Connection: close" avoids ambiguity
+			// for HTTP/2-capable clients (e.g. Velocity's java.net.http.HttpClient) that
+			// probe for an h2c upgrade: this server doesn't understand h2c and silently
+			// answers as plain HTTP/1.1, but replying "keep-alive" to an unacknowledged
+			// upgrade offer left such clients waiting indefinitely instead of treating the
+			// exchange as complete.
+			boolean keepAlive = false;
 
 			if (r == null) {
 				throw new ResponseException(Status.INTERNAL_ERROR, "SERVER INTERNAL ERROR: Serve() returned a null response.");
