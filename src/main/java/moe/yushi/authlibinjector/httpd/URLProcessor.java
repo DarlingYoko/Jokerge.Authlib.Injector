@@ -210,6 +210,14 @@ public class URLProcessor {
 		}
 		log(DEBUG, "Reverse proxy: < " + responseCode + " " + reponseMessage + " , headers: " + responseHeaders);
 
+		if (upstreamIn != null && url.contains("hasJoined")) {
+			java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+			transfer(upstreamIn, buffer);
+			byte[] bodyBytes = buffer.toByteArray();
+			log(DEBUG, "Reverse proxy: hasJoined response body (" + bodyBytes.length + " bytes): " + new String(bodyBytes, java.nio.charset.StandardCharsets.UTF_8));
+			upstreamIn = new java.io.ByteArrayInputStream(bodyBytes);
+		}
+
 		IStatus status = new IStatus() {
 			@Override
 			public int getRequestStatus() {
