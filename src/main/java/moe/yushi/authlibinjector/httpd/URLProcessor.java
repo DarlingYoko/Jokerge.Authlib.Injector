@@ -210,14 +210,6 @@ public class URLProcessor {
 		}
 		log(DEBUG, "Reverse proxy: < " + responseCode + " " + reponseMessage + " , headers: " + responseHeaders);
 
-		if (upstreamIn != null && url.contains("hasJoined")) {
-			java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
-			transfer(upstreamIn, buffer);
-			byte[] bodyBytes = buffer.toByteArray();
-			log(DEBUG, "Reverse proxy: hasJoined response body (" + bodyBytes.length + " bytes): " + new String(bodyBytes, java.nio.charset.StandardCharsets.UTF_8));
-			upstreamIn = new java.io.ByteArrayInputStream(bodyBytes);
-		}
-
 		IStatus status = new IStatus() {
 			@Override
 			public int getRequestStatus() {
@@ -241,8 +233,14 @@ public class URLProcessor {
 		Response response;
 		if (contentLength == -1) {
 			if (conn.getHeaderField("transfer-encoding") == null) {
-				// no content
-				response = Response.newFixedLength(status, null, upstreamIn, 0);
+				// Neither Content-Length nor Transfer-Encoding was sent. This does NOT mean
+				// the body is empty (some upstreams, e.g. behind certain reverse proxies,
+				// omit both and just delimit the body by closing the connection) - buffer
+				// it and use the actual byte count instead of assuming 0.
+				java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+				transfer(upstreamIn, buffer);
+				byte[] bodyBytes = buffer.toByteArray();
+				response = Response.newFixedLength(status, null, new java.io.ByteArrayInputStream(bodyBytes), bodyBytes.length);
 			} else {
 				response = Response.newChunked(status, null, upstreamIn);
 			}
