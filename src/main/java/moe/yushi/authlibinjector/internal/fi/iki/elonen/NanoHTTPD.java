@@ -114,14 +114,6 @@ public abstract class NanoHTTPD {
 			} catch (Exception e) {
 				log(ERROR, "Communication with the client broken, or an bug in the handler code", e);
 			} finally {
-				// Drain any bytes the client already sent but we never read (e.g. some
-				// HTTP/2-capable clients speculatively send the h2c connection preface
-				// right after an Upgrade request, which this server doesn't understand
-				// and never consumes) before closing. Closing a socket while data is
-				// still sitting in its receive buffer makes the OS send an abrupt RST
-				// instead of a graceful FIN, which can make an otherwise-complete
-				// response look like a connection error to the client.
-				drainQuietly(this.inputStream);
 				safeClose(outputStream);
 				safeClose(this.inputStream);
 				safeClose(this.acceptSocket);
@@ -202,28 +194,6 @@ public abstract class NanoHTTPD {
 			} while (!NanoHTTPD.this.serverSocket.isClosed());
 		}
 	}
-
-	/**
-	 * Reads and discards whatever is immediately available on the stream, without
-	 * blocking for more. The accept socket already has a short SO_TIMEOUT set, so a
-	 * read that would otherwise block bails out quickly instead of stalling shutdown.
-	 */
-	static final void drainQuietly(InputStream in) {
-		try {
-			byte[] buf = new byte[BUFSIZE];
-			int available;
-			while ((available = in.available()) > 0) {
-				int read = in.read(buf, 0, Math.min(available, buf.length));
-				if (read == -1) {
-					break;
-				}
-			}
-		} catch (IOException e) {
-			// best-effort only
-		}
-	}
-
-	private static final int BUFSIZE = 8192;
 
 	static final void safeClose(Object closeable) {
 		try {

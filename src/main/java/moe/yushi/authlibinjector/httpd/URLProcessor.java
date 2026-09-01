@@ -186,15 +186,6 @@ public class URLProcessor {
 		HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
 		conn.setRequestMethod(method);
 		conn.setDoOutput(clientIn != null);
-		conn.setConnectTimeout(10_000);
-		conn.setReadTimeout(10_000);
-		// Force the upstream to close the connection after responding. Some upstreams
-		// (e.g. behind certain reverse proxies) send a response with neither
-		// Content-Length nor Transfer-Encoding; per RFC 7230 3.3.3 the only way to
-		// delimit such a body is the connection closing. If we let Java reuse a
-		// keep-alive connection here, reading the body can block forever waiting for
-		// an EOF that keep-alive prevents from ever happening.
-		conn.setRequestProperty("Connection", "close");
 		requestHeaders.forEach(conn::setRequestProperty);
 
 		if (clientIn != null && !method.equalsIgnoreCase("GET") && !method.equalsIgnoreCase("HEAD")) {
@@ -242,14 +233,8 @@ public class URLProcessor {
 		Response response;
 		if (contentLength == -1) {
 			if (conn.getHeaderField("transfer-encoding") == null) {
-				// Neither Content-Length nor Transfer-Encoding was sent. This does NOT mean
-				// the body is empty (some upstreams, e.g. behind certain reverse proxies,
-				// omit both and just delimit the body by closing the connection) - buffer
-				// it and use the actual byte count instead of assuming 0.
-				java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
-				transfer(upstreamIn, buffer);
-				byte[] bodyBytes = buffer.toByteArray();
-				response = Response.newFixedLength(status, null, new java.io.ByteArrayInputStream(bodyBytes), bodyBytes.length);
+				// no content
+				response = Response.newFixedLength(status, null, upstreamIn, 0);
 			} else {
 				response = Response.newChunked(status, null, upstreamIn);
 			}
