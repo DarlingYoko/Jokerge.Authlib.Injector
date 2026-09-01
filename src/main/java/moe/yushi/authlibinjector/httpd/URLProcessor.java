@@ -186,6 +186,15 @@ public class URLProcessor {
 		HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
 		conn.setRequestMethod(method);
 		conn.setDoOutput(clientIn != null);
+		conn.setConnectTimeout(10_000);
+		conn.setReadTimeout(10_000);
+		// Force the upstream to close the connection after responding. Some upstreams
+		// (e.g. behind certain reverse proxies) send a response with neither
+		// Content-Length nor Transfer-Encoding; per RFC 7230 3.3.3 the only way to
+		// delimit such a body is the connection closing. If we let Java reuse a
+		// keep-alive connection here, reading the body can block forever waiting for
+		// an EOF that keep-alive prevents from ever happening.
+		conn.setRequestProperty("Connection", "close");
 		requestHeaders.forEach(conn::setRequestProperty);
 
 		if (clientIn != null && !method.equalsIgnoreCase("GET") && !method.equalsIgnoreCase("HEAD")) {
